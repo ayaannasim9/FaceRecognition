@@ -1,2 +1,3 @@
 .sklearn_data/
 face_db/
+__pycache__/
