@@ -1,3 +1,4 @@
 .sklearn_data/
 face_db/
 __pycache__/
+opencv.py
