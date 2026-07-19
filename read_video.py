@@ -1,7 +1,9 @@
 import cv2 as cv
+from face_recog import find_matches, identify_face
 
 VIDEO_PATH = "face_vid.mp4"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
+DATABASE = "face_db"
 
 
 def detect_faces(frame, face_cascade):
@@ -36,12 +38,35 @@ def play_video(video_path):
     if face_cascade.empty():
         raise RuntimeError(f"Unable to load cascade: {CASCADE_PATH}")
 
+    frame_number=0
+    predicted_person="unknown"
     while True:
         success, frame = capture.read()
         if not success:
             break
 
+        frame_number+=1
         faces = detect_faces(frame, face_cascade)
+        
+        if len(faces) > 0:
+            largest_face = max(faces, key=lambda face: face[2] * face[3])
+            x, y, width, height = largest_face
+
+            if frame_number % 15 == 0:
+                face_crop = frame[y:y + height, x:x + width]
+                matches = find_matches(face_crop, database=DATABASE)
+                predicted_person = identify_face(matches) or "Unknown"
+
+            cv.putText(
+                frame,
+                predicted_person,
+                (x, max(y - 10, 20)),
+                cv.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (255, 0, 0),
+                2,
+            )
+
         draw_faces(frame, faces)
         cv.imshow("Capture - Face detection", frame)
 
