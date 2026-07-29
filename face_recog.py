@@ -11,6 +11,7 @@ def find_matches(query_image, database):
         db_path=database,
         model_name="VGG-Face",
         detector_backend="skip",
+        silent=True
     )
 
     return results[0]
