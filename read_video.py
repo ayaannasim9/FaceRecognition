@@ -1,7 +1,8 @@
 import cv2 as cv
 from face_recog import find_matches, identify_face
+from collections import Counter, deque
 
-VIDEO_PATH = "face_vid.mp4"
+VIDEO_PATH = "IMG_6113.MOV"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
 DATABASE = "face_db"
 
@@ -28,7 +29,9 @@ def draw_faces(frame, faces):
             4,
         )
 
-
+def clean(name):
+    return name.translate(str.maketrans("_", " "))
+    
 def play_video(video_path):
     capture = cv.VideoCapture(video_path)
     if not capture.isOpened():
@@ -39,7 +42,8 @@ def play_video(video_path):
         raise RuntimeError(f"Unable to load cascade: {CASCADE_PATH}")
 
     frame_number=0
-    predicted_person="unknown"
+    predicted_person="Unkown"
+    prediction_history=deque(maxlen=3)
     while True:
         success, frame = capture.read()
         if not success:
@@ -52,14 +56,20 @@ def play_video(video_path):
             largest_face = max(faces, key=lambda face: face[2] * face[3])
             x, y, width, height = largest_face
 
-            if frame_number % 15 == 0:
+            if frame_number % 30 == 0:
                 face_crop = frame[y:y + height, x:x + width]
                 matches = find_matches(face_crop, database=DATABASE)
-                predicted_person = identify_face(matches) or "Unknown"
+                new_prediction = identify_face(matches) or "Unknown"
+                prediction_history.append(new_prediction)
+
+                most_common_person, votes=Counter(prediction_history).most_common(1)[0]
+
+                if votes>=2:
+                    predicted_person=most_common_person
 
             cv.putText(
                 frame,
-                predicted_person,
+                clean(predicted_person),
                 (x, max(y - 10, 20)),
                 cv.FONT_HERSHEY_SIMPLEX,
                 0.8,
