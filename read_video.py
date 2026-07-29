@@ -1,6 +1,7 @@
 import cv2 as cv
 from face_recog import find_matches, identify_face
 from collections import Counter, deque
+from concurrent.futures import ThreadPoolExecutor
 
 VIDEO_PATH = "IMG_6113.MOV"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
@@ -40,6 +41,12 @@ def voting(new_prediction, prediction_history, predicted_person):
         predicted_person=most_common_person
     return predicted_person
 
+def recognize_face(cropped_face):
+    matches=find_matches(cropped_face,database=DATABASE)
+    new_prediction=identify_face(matches) or "Unknown"
+
+    return new_prediction
+
 def play_video(video_path):
     capture = cv.VideoCapture(video_path)
     if not capture.isOpened():
@@ -50,26 +57,34 @@ def play_video(video_path):
         raise RuntimeError(f"Unable to load cascade: {CASCADE_PATH}")
 
     frame_number=0
-    predicted_person="Unkown"
+    predicted_person="Unknown"
     prediction_history=deque(maxlen=3)
+
+    executor=ThreadPoolExecutor(max_workers=1)
+    recognition_job=None
     while True:
         success, frame = capture.read()
         if not success:
             break
 
         frame_number+=1
+        if recognition_job is not None and recognition_job.done():
+            new_prediction=recognition_job.result()
+
+            predicted_person=voting(new_prediction,prediction_history,predicted_person)
+
+            recognition_job=None
+    
         faces = detect_faces(frame, face_cascade)
         
         if len(faces) > 0:
             largest_face = max(faces, key=lambda face: face[2] * face[3])
             x, y, width, height = largest_face
 
-            if frame_number % 30 == 0:
+            if recognition_job is None:
                 face_crop = frame[y:y + height, x:x + width]
-                matches = find_matches(face_crop, database=DATABASE)
-                new_prediction = identify_face(matches) or "Unknown"
+                recognition_job=executor.submit(recognize_face,face_crop.copy())
 
-                predicted_person=voting(new_prediction,prediction_history, predicted_person)
 
             cv.putText(
                 frame,
@@ -87,6 +102,7 @@ def play_video(video_path):
         if cv.waitKey(1) & 0xFF == ord("q"):
             break
 
+    executor.shutdown()
     capture.release()
     cv.destroyAllWindows()
 
