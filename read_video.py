@@ -31,7 +31,15 @@ def draw_faces(frame, faces):
 
 def clean(name):
     return name.translate(str.maketrans("_", " "))
-    
+
+def voting(new_prediction, prediction_history, predicted_person):
+    prediction_history.append(new_prediction)
+    most_common_person, votes=Counter(prediction_history).most_common(1)[0]
+
+    if votes>=2:
+        predicted_person=most_common_person
+    return predicted_person
+
 def play_video(video_path):
     capture = cv.VideoCapture(video_path)
     if not capture.isOpened():
@@ -60,12 +68,8 @@ def play_video(video_path):
                 face_crop = frame[y:y + height, x:x + width]
                 matches = find_matches(face_crop, database=DATABASE)
                 new_prediction = identify_face(matches) or "Unknown"
-                prediction_history.append(new_prediction)
 
-                most_common_person, votes=Counter(prediction_history).most_common(1)[0]
-
-                if votes>=2:
-                    predicted_person=most_common_person
+                predicted_person=voting(new_prediction,prediction_history, predicted_person)
 
             cv.putText(
                 frame,
