@@ -6,18 +6,39 @@ from concurrent.futures import ThreadPoolExecutor
 VIDEO_PATH = "IMG_6113.MOV"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
 DATABASE = "face_db"
+DETECTION_SCALE=0.5
+MIN_FACE_SIZE=70
 
 
 def detect_faces(frame, face_cascade):
-    frame_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-    # frame_gray = cv.equalizeHist(frame_gray)
+    small_frame=cv.resize(
+        frame,
+        None,
+        fx=DETECTION_SCALE,
+        fy=DETECTION_SCALE,
+        interpolation=cv.INTER_AREA
+    )
 
-    return face_cascade.detectMultiScale(
+    frame_gray = cv.cvtColor(small_frame, cv.COLOR_BGR2GRAY)
+    minimum_size=int(MIN_FACE_SIZE*DETECTION_SCALE)
+
+    small_faces=face_cascade.detectMultiScale(
         frame_gray,
         scaleFactor=1.05,
         minNeighbors=5,
-        minSize=(70, 70),
+        minSize=(minimum_size,minimum_size)
     )
+    # frame_gray = cv.equalizeHist(frame_gray)
+
+    return [
+        (
+            int(x/DETECTION_SCALE),
+        int(y/DETECTION_SCALE),
+        int(width/DETECTION_SCALE),
+        int(height/DETECTION_SCALE),
+        )
+        for x,y,width, height in small_faces
+    ]
 
 
 def draw_faces(frame, faces):
