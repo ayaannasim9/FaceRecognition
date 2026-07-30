@@ -3,6 +3,6 @@ face_db/
 __pycache__/
 opencv.py
 video.MOV
-face_vid.mp4
+*.mp4
 .vscode/
 *.MOV

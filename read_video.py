@@ -8,6 +8,7 @@ CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
 DATABASE = "face_db"
 DETECTION_SCALE=0.5
 MIN_FACE_SIZE=70
+OUTPUT_PATH="annotated_video.mp4"
 
 
 def detect_faces(frame, face_cascade):
@@ -73,6 +74,16 @@ def play_video(video_path):
     if not capture.isOpened():
         raise RuntimeError(f"Unable to open video: {video_path}")
 
+    frame_width=int(capture.get(cv.CAP_PROP_FRAME_WIDTH))
+    frame_height=int(capture.get(cv.CAP_PROP_FRAME_HEIGHT))
+    fps=(capture.get(cv.CAP_PROP_FPS))
+
+    fourcc=cv.VideoWriter_fourcc(*"mp4v")
+    writer=cv.VideoWriter(OUTPUT_PATH,fourcc,fps,(frame_width,frame_height))
+
+    if not writer.isOpened():
+        raise RuntimeError(f"Unable to open writer")
+
     face_cascade = cv.CascadeClassifier(CASCADE_PATH)
     if face_cascade.empty():
         raise RuntimeError(f"Unable to load cascade: {CASCADE_PATH}")
@@ -118,6 +129,8 @@ def play_video(video_path):
             )
 
         draw_faces(frame, faces)
+
+        writer.write(frame)
         cv.imshow("Capture - Face detection", frame)
 
         if cv.waitKey(1) & 0xFF == ord("q"):
@@ -125,6 +138,7 @@ def play_video(video_path):
 
     executor.shutdown()
     capture.release()
+    writer.release()
     cv.destroyAllWindows()
 
 
