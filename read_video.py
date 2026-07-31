@@ -1,12 +1,13 @@
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
+from face_track import FaceTrack
 
 import cv2 as cv
 
 from face_recog import find_matches, identify_face
 
 
-VIDEO_PATH = "IMG_6113.MOV"
+VIDEO_PATH = "IMG_6132.MOV"
 OUTPUT_PATH = "annotated_video.mp4"
 DATABASE = "face_db"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
@@ -18,6 +19,9 @@ VOTES_REQUIRED = 2
 
 BOX_COLOR = (255, 0, 0)
 BOX_THICKNESS = 4
+
+IOU_THRESHOLD=0.3
+MAX_MISSED_FRAMES=8
 
 
 def load_face_cascade():
@@ -62,7 +66,7 @@ def detect_faces(frame, face_cascade):
     small_faces = face_cascade.detectMultiScale(
         frame_gray,
         scaleFactor=1.05,
-        minNeighbors=5,
+        minNeighbors=10,
         minSize=(minimum_size, minimum_size),
     )
 
@@ -123,6 +127,8 @@ def recognize_face(cropped_face):
 
 
 def play_video(video_path, output_path):
+    tracks={}
+    next_track_id=1
     capture = cv.VideoCapture(video_path)
     if not capture.isOpened():
         raise RuntimeError(f"Unable to open video: {video_path}")
@@ -153,21 +159,49 @@ def play_video(video_path, output_path):
                     recognition_job = None
 
                 faces = detect_faces(frame, face_cascade)
+                matched_track_ids=set()
 
-                if faces:
-                    primary_face = largest_face(faces)
-                    x, y, width, height = primary_face
+                for face in faces:
+                    best_iou=0
+                    best_track=None
+                    for track_id, track in tracks.items():
+                        if track_id in matched_track_ids:
+                            continue
+                        iou=track.calculate_iou(face)
+                        if iou>best_iou:
+                            best_iou=iou
+                            best_track=track
+                    if best_iou>=IOU_THRESHOLD:
+                        best_track.box=face
+                        best_track.missed_frames=0
+                        matched_track_ids.add(best_track.track_id)
+                    else:
+                        tracks[next_track_id]=FaceTrack(track_id=next_track_id, box=face)
+                        matched_track_ids.add(next_track_id)
+                        next_track_id+=1
+                for track_id, track in list(tracks.items()):
+                    if track_id not in matched_track_ids:
+                        track.missed_frames+=1
+                    if track.missed_frames>=MAX_MISSED_FRAMES:
+                        del tracks[track_id]
+                    
 
-                    if recognition_job is None:
-                        face_crop = frame[y : y + height, x : x + width]
-                        recognition_job = executor.submit(
-                            recognize_face,
-                            face_crop.copy(),
-                        )
+                # if faces:
+                #     primary_face = largest_face(faces)
+                #     x, y, width, height = primary_face
 
-                    draw_name(frame, primary_face, predicted_person)
+                    # if recognition_job is None:
+                    #     face_crop = frame[y : y + height, x : x + width]
+                    #     recognition_job = executor.submit(
+                    #         recognize_face,
+                    #         face_crop.copy(),
+                    #     )
 
-                draw_faces(frame, faces)
+                    # draw_name(frame, primary_face, predicted_person)
+
+                for track in tracks.values():
+                    draw_faces(frame,[track.box])
+                    draw_name(frame,track.box, f"{track.track_id}")
                 writer.write(frame)
                 cv.imshow("Capture - Face detection", frame)
 
