@@ -7,7 +7,7 @@ import cv2 as cv
 from face_recog import find_matches, identify_face, prepare_face_recognition
 
 
-VIDEO_PATH = "IMG_6132.MOV"
+VIDEO_PATH = "IMG_6133.MOV"
 OUTPUT_PATH = "annotated_video.mp4"
 DATABASE = "face_db"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
@@ -259,19 +259,6 @@ def play_video(video_path, output_path):
                         recognition_track_id = track.track_id
                         track.recognition_attempts += 1
                         track.last_recognition_frame = frame_number
-
-                # if faces:
-                #     primary_face = largest_face(faces)
-                #     x, y, width, height = primary_face
-
-                    # if recognition_job is None:
-                    #     face_crop = frame[y : y + height, x : x + width]
-                    #     recognition_job = executor.submit(
-                    #         recognize_face,
-                    #         face_crop.copy(),
-                    #     )
-
-                    # draw_name(frame, primary_face, predicted_person)
 
                 for track in tracks.values():
                     if not track.confirmed or track.missed_frames>0:
