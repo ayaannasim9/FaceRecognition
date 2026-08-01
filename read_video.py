@@ -7,13 +7,13 @@ import cv2 as cv
 from face_recog import find_matches, identify_face
 
 
-VIDEO_PATH = "IMG_6132.MOV"
+VIDEO_PATH = "IMG_6133.MOV"
 OUTPUT_PATH = "annotated_video.mp4"
 DATABASE = "face_db"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
 
 DETECTION_SCALE = 0.5
-MIN_FACE_SIZE = 70
+MIN_FACE_SIZE = 120
 VOTE_HISTORY_SIZE = 3
 VOTES_REQUIRED = 2
 
@@ -139,9 +139,10 @@ def play_video(video_path, output_path):
         face_cascade = load_face_cascade()
         writer = create_video_writer(capture, output_path)
 
-        predicted_person = "Unknown"
-        prediction_history = deque(maxlen=VOTE_HISTORY_SIZE)
+        # predicted_person = "Unknown"
+        # prediction_history = deque(maxlen=VOTE_HISTORY_SIZE)
         recognition_job = None
+        recognition_track_id=None
 
         with ThreadPoolExecutor(max_workers=1) as executor:
             while True:
@@ -149,14 +150,19 @@ def play_video(video_path, output_path):
                 if not success:
                     break
 
+                # jobs completed,getting result
                 if recognition_job is not None and recognition_job.done():
                     new_prediction = recognition_job.result()
-                    predicted_person = vote_for_prediction(
-                        new_prediction,
-                        prediction_history,
-                        predicted_person,
-                    )
+                    track=tracks.get(recognition_track_id)
+
+                    if track is not None:
+                        track.name = vote_for_prediction(
+                            new_prediction,
+                            track.prediction_history,
+                            track.name
+                        )
                     recognition_job = None
+                    recognition_track_id=None
 
                 faces = detect_faces(frame, face_cascade)
                 matched_track_ids=set()
@@ -188,7 +194,34 @@ def play_video(video_path, output_path):
                         track.consecutive_hits=0
                     if track.missed_frames>=MAX_MISSED_FRAMES:
                         del tracks[track_id]
-                    
+
+                # starting jobs
+                if recognition_job is None:
+                    eligible_tracks = [
+                        track
+                        for track in tracks.values()
+                        if track.confirmed
+                        and track.missed_frames == 0
+                        and track.name == "Unknown"
+                    ]
+
+                    if eligible_tracks:
+                        track = min(
+                            eligible_tracks,
+                            key=lambda candidate: (
+                                candidate.recognition_attempts,
+                                candidate.track_id,
+                            ),
+                        )
+
+                        x, y, width, height = track.box
+                        face_crop = frame[y : y + height, x : x + width]
+                        recognition_job = executor.submit(
+                            recognize_face,
+                            face_crop.copy(),
+                        )
+                        recognition_track_id = track.track_id
+                        track.recognition_attempts += 1
 
                 # if faces:
                 #     primary_face = largest_face(faces)
@@ -207,7 +240,7 @@ def play_video(video_path, output_path):
                     if not track.confirmed:
                         continue
                     draw_faces(frame,[track.box])
-                    draw_name(frame,track.box, f"{track.track_id}")
+                    draw_name(frame,track.box, f"{track.name}")
                 writer.write(frame)
                 cv.imshow("Capture - Face detection", frame)
 
