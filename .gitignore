@@ -7,5 +7,4 @@ video.MOV
 *.mp4
 .vscode/
 *.MOV
-extract_data.py
 .DS_Store
