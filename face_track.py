@@ -9,6 +9,8 @@ class FaceTrack:
         default_factory=lambda: deque(maxlen=3)
     )
     missed_frames:int=0
+    consecutive_hits:int=1
+    confirmed:bool=False
 
     def calculate_iou(self, box_B):
         xa, ya, wa, ha=self.box

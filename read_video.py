@@ -174,6 +174,9 @@ def play_video(video_path, output_path):
                     if best_iou>=IOU_THRESHOLD:
                         best_track.box=face
                         best_track.missed_frames=0
+                        best_track.consecutive_hits+=1
+                        if best_track.consecutive_hits>=3:
+                            best_track.confirmed=True
                         matched_track_ids.add(best_track.track_id)
                     else:
                         tracks[next_track_id]=FaceTrack(track_id=next_track_id, box=face)
@@ -182,6 +185,7 @@ def play_video(video_path, output_path):
                 for track_id, track in list(tracks.items()):
                     if track_id not in matched_track_ids:
                         track.missed_frames+=1
+                        track.consecutive_hits=0
                     if track.missed_frames>=MAX_MISSED_FRAMES:
                         del tracks[track_id]
                     
@@ -200,6 +204,8 @@ def play_video(video_path, output_path):
                     # draw_name(frame, primary_face, predicted_person)
 
                 for track in tracks.values():
+                    if not track.confirmed:
+                        continue
                     draw_faces(frame,[track.box])
                     draw_name(frame,track.box, f"{track.track_id}")
                 writer.write(frame)
