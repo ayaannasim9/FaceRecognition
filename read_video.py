@@ -162,8 +162,6 @@ def play_video(video_path, output_path):
         prepare_face_recognition(DATABASE)
         writer = create_video_writer(capture, output_path)
 
-        # predicted_person = "Unknown"
-        # prediction_history = deque(maxlen=VOTE_HISTORY_SIZE)
         recognition_job = None
         recognition_track_id=None
         frame_number = 0
