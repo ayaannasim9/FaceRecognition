@@ -4,10 +4,10 @@ from face_track import FaceTrack
 
 import cv2 as cv
 
-from face_recog import find_matches, identify_face
+from face_recog import find_matches, identify_face, prepare_face_recognition
 
 
-VIDEO_PATH = "IMG_6133.MOV"
+VIDEO_PATH = "IMG_6135.MOV"
 OUTPUT_PATH = "annotated_video.mp4"
 DATABASE = "face_db"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
@@ -16,12 +16,14 @@ DETECTION_SCALE = 0.5
 MIN_FACE_SIZE = 120
 VOTE_HISTORY_SIZE = 3
 VOTES_REQUIRED = 2
+RECOGNITION_INTERVAL_FRAMES = 30
+FACE_CROP_PADDING = 0.2
 
 BOX_COLOR = (255, 0, 0)
 BOX_THICKNESS = 4
 
 IOU_THRESHOLD=0.3
-MAX_MISSED_FRAMES=8
+MAX_MISSED_FRAMES=80
 
 
 def load_face_cascade():
@@ -112,6 +114,9 @@ def draw_name(frame, face, name):
 
 
 def vote_for_prediction(new_prediction, prediction_history, current_prediction):
+    if new_prediction == "Unknown":
+        return current_prediction
+
     prediction_history.append(new_prediction)
     most_common_person, votes = Counter(prediction_history).most_common(1)[0]
 
@@ -126,6 +131,20 @@ def recognize_face(cropped_face):
     return identify_face(matches) or "Unknown"
 
 
+def crop_face(frame, face):
+    frame_height, frame_width = frame.shape[:2]
+    x, y, width, height = face
+    padding_x = int(width * FACE_CROP_PADDING)
+    padding_y = int(height * FACE_CROP_PADDING)
+
+    left = max(0, x - padding_x)
+    top = max(0, y - padding_y)
+    right = min(frame_width, x + width + padding_x)
+    bottom = min(frame_height, y + height + padding_y)
+
+    return frame[top:bottom, left:right]
+
+
 def play_video(video_path, output_path):
     tracks={}
     next_track_id=1
@@ -137,18 +156,21 @@ def play_video(video_path, output_path):
 
     try:
         face_cascade = load_face_cascade()
+        prepare_face_recognition(DATABASE)
         writer = create_video_writer(capture, output_path)
 
         # predicted_person = "Unknown"
         # prediction_history = deque(maxlen=VOTE_HISTORY_SIZE)
         recognition_job = None
         recognition_track_id=None
+        frame_number = 0
 
         with ThreadPoolExecutor(max_workers=1) as executor:
             while True:
                 success, frame = capture.read()
                 if not success:
                     break
+                frame_number += 1
 
                 # jobs completed,getting result
                 if recognition_job is not None and recognition_job.done():
@@ -156,10 +178,21 @@ def play_video(video_path, output_path):
                     track=tracks.get(recognition_track_id)
 
                     if track is not None:
+                        previous_name = track.name
                         track.name = vote_for_prediction(
                             new_prediction,
                             track.prediction_history,
                             track.name
+                        )
+                        if track.name != previous_name:
+                            print(
+                                f"Track {track.track_id}: "
+                                f"{previous_name} -> {track.name}"
+                            )
+                    else:
+                        print(
+                            f"Discarded result for expired track "
+                            f"{recognition_track_id}"
                         )
                     recognition_job = None
                     recognition_track_id=None
@@ -202,7 +235,8 @@ def play_video(video_path, output_path):
                         for track in tracks.values()
                         if track.confirmed
                         and track.missed_frames == 0
-                        and track.name == "Unknown"
+                        and frame_number - track.last_recognition_frame
+                        >= RECOGNITION_INTERVAL_FRAMES
                     ]
 
                     if eligible_tracks:
@@ -214,14 +248,14 @@ def play_video(video_path, output_path):
                             ),
                         )
 
-                        x, y, width, height = track.box
-                        face_crop = frame[y : y + height, x : x + width]
+                        face_crop = crop_face(frame, track.box)
                         recognition_job = executor.submit(
                             recognize_face,
                             face_crop.copy(),
                         )
                         recognition_track_id = track.track_id
                         track.recognition_attempts += 1
+                        track.last_recognition_frame = frame_number
 
                 # if faces:
                 #     primary_face = largest_face(faces)

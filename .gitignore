@@ -1,4 +1,5 @@
 .sklearn_data/
+datasets/
 face_db/
 __pycache__/
 opencv.py
@@ -6,3 +7,4 @@ video.MOV
 *.mp4
 .vscode/
 *.MOV
+extract_data.py

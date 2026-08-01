@@ -12,6 +12,7 @@ class FaceTrack:
     consecutive_hits:int=1
     confirmed:bool=False
     recognition_attempts:int=0
+    last_recognition_frame:int=-30
 
     def calculate_iou(self, box_B):
         xa, ya, wa, ha=self.box
