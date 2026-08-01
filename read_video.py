@@ -7,7 +7,7 @@ import cv2 as cv
 from face_recog import find_matches, identify_face, prepare_face_recognition
 
 
-VIDEO_PATH = "IMG_6135.MOV"
+VIDEO_PATH = "IMG_6132.MOV"
 OUTPUT_PATH = "annotated_video.mp4"
 DATABASE = "face_db"
 CASCADE_PATH = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
@@ -18,12 +18,15 @@ VOTE_HISTORY_SIZE = 3
 VOTES_REQUIRED = 2
 RECOGNITION_INTERVAL_FRAMES = 30
 FACE_CROP_PADDING = 0.2
+SCALE_FACTOR=1.1
+MIN_NEIGHBORS=11
 
 BOX_COLOR = (255, 0, 0)
 BOX_THICKNESS = 4
 
 IOU_THRESHOLD=0.3
 MAX_MISSED_FRAMES=80
+CONFIRMATION_HITS=5
 
 
 def load_face_cascade():
@@ -67,8 +70,8 @@ def detect_faces(frame, face_cascade):
 
     small_faces = face_cascade.detectMultiScale(
         frame_gray,
-        scaleFactor=1.05,
-        minNeighbors=10,
+        scaleFactor=SCALE_FACTOR,
+        minNeighbors=MIN_NEIGHBORS,
         minSize=(minimum_size, minimum_size),
     )
 
@@ -214,7 +217,7 @@ def play_video(video_path, output_path):
                         best_track.box=face
                         best_track.missed_frames=0
                         best_track.consecutive_hits+=1
-                        if best_track.consecutive_hits>=3:
+                        if best_track.consecutive_hits>=CONFIRMATION_HITS:
                             best_track.confirmed=True
                         matched_track_ids.add(best_track.track_id)
                     else:
@@ -271,7 +274,7 @@ def play_video(video_path, output_path):
                     # draw_name(frame, primary_face, predicted_person)
 
                 for track in tracks.values():
-                    if not track.confirmed:
+                    if not track.confirmed or track.missed_frames>0:
                         continue
                     draw_faces(frame,[track.box])
                     draw_name(frame,track.box, f"{track.name}")

@@ -8,3 +8,4 @@ video.MOV
 .vscode/
 *.MOV
 extract_data.py
+.DS_Store
